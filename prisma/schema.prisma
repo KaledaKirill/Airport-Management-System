@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// REFERENCE TABLES (SPRAVOCHNIKI)
+// ============================================
+
+model Airlines {
+  id        BigInt     @id @default(autoincrement())
+  name      String     @unique @db.VarChar(50)
+  iataCode  String?    @unique @map("iata_code") @db.VarChar(10)
+  country   String     @db.VarChar(100)
+
+  // Relations
+  aircraft    Aircraft[]
+  flights     Flights[]
+  crewMembers CrewMembers[]
+
+  @@map("airlines")
+}
+
+model Airports {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  iataCode  String   @unique @map("iata_code") @db.VarChar(10)
+  city      String   @db.VarChar(100)
+  country   String   @db.VarChar(100)
+  timezone  String   @db.VarChar(10)
+
+  // Relations
+  departureFlights Flights[] @relation("DepartureAirport")
+  arrivalFlights   Flights[] @relation("ArrivalAirport")
+
+  @@map("airports")
+}
+
+model CrewPositions {
+  id   BigInt @id @default(autoincrement())
+  name String @unique @db.VarChar(50)
+
+  // Relations
+  crewMembers CrewMembers[]
+
+  @@map("crew_positions")
+}
+
+// ============================================
+// MAIN TABLES
+// ============================================
+
+model Flights {
+  id                 BigInt      @id @default(autoincrement())
+  flightNumber       String      @map("flight_number") @db.VarChar(20)
+  airlineId          BigInt      @map("airline_id")
+  departureAirportId BigInt      @map("departure_airport_id")
+  arrivalAirportId   BigInt      @map("arrival_airport_id")
+  aircraftId         BigInt      @map("aircraft_id")
+  departureTime      DateTime    @map("departure_time")
+  arrivalTime        DateTime    @map("arrival_time")
+  status             String      @default("scheduled") @db.VarChar(20)
+  gate               String?     @db.VarChar(10)
+
+  // Relations
+  airline           Airlines          @relation(fields: [airlineId], references: [id])
+  departureAirport  Airports          @relation("DepartureAirport", fields: [departureAirportId], references: [id])
+  arrivalAirport    Airports          @relation("ArrivalAirport", fields: [arrivalAirportId], references: [id])
+  aircraft          Aircraft          @relation(fields: [aircraftId], references: [id])
+  tickets           Tickets[]
+  crewAssignments   CrewAssignments[]
+
+  // Indexes for common queries
+  @@index([flightNumber])
+  @@index([status])
+  @@index([departureTime])
+  @@index([airlineId])
+  @@map("flights")
+}
+
+model Aircraft {
+  id                BigInt  @id @default(autoincrement())
+  registrationNumber String  @unique @map("registration_number") @db.VarChar(20)
+  model             String  @db.VarChar(50)
+  manufacturer      String  @db.VarChar(50)
+  airlineId         BigInt  @map("airline_id")
+  capacity          Int
+  yearManufactured  Int     @map("year_manufactured")
+
+  // Relations
+  airline Airlines  @relation(fields: [airlineId], references: [id])
+  flights  Flights[]
+
+  @@index([registrationNumber])
+  @@map("aircraft")
+}
+
+model Passengers {
+  id              BigInt   @id @default(autoincrement())
+  passportNumber  String   @unique @map("passport_number") @db.VarChar(20)
+  fullName        String   @map("full_name") @db.VarChar(100)
+  dateOfBirth     DateTime @map("date_of_birth") @db.Date
+  nationality     String   @db.VarChar(50)
+  email           String?  @db.VarChar(100)
+
+  // Relations
+  tickets Tickets[]
+
+  @@index([passportNumber])
+  @@index([email])
+  @@map("passengers")
+}
+
+model Tickets {
+  id            BigInt      @id @default(autoincrement())
+  ticketNumber  String      @unique @map("ticket_number") @db.VarChar(30)
+  passengerId   BigInt      @map("passenger_id")
+  flightId      BigInt      @map("flight_id")
+  seatNumber    String?     @map("seat_number") @db.VarChar(20)
+  class         String      @default("economy") @db.VarChar(20)
+  price         Decimal     @db.Decimal(10, 2)
+  bookingDate   DateTime    @default(now()) @map("booking_date")
+  status        String      @default("booked") @db.VarChar(20)
+
+  // Relations
+  passenger Passengers @relation(fields: [passengerId], references: [id])
+  flight    Flights    @relation(fields: [flightId], references: [id])
+  baggage   Baggage[]
+
+  @@index([ticketNumber])
+  @@index([status])
+  @@map("tickets")
+}
+
+model Baggage {
+  id         BigInt   @id @default(autoincrement())
+  ticketId   BigInt   @map("ticket_id")
+  tagNumber  String   @unique @map("tag_number") @db.VarChar(30)
+  weight     Decimal  @db.Decimal(5, 2)
+  type       String   @default("checked") @db.VarChar(50)
+  status     String   @default("checked_in") @map("status") @db.VarChar(20)
+
+  // Relations
+  ticket Tickets @relation(fields: [ticketId], references: [id])
+
+  @@index([tagNumber])
+  @@map("baggage")
+}
+
+model CrewMembers {
+  id              BigInt      @id @default(autoincrement())
+  passportNumber  String      @unique @map("passport_number") @db.VarChar(20)
+  fullName        String      @map("full_name") @db.VarChar(100)
+  crewPositionId  BigInt      @map("crew_position_id")
+  airlineId       BigInt      @map("airline_id")
+  hireDate        DateTime    @map("hire_date") @db.Date
+  licenseNumber   String?     @map("license_number") @db.VarChar(50)
+
+  // Relations
+  crewPosition  CrewPositions    @relation(fields: [crewPositionId], references: [id])
+  airline       Airlines         @relation(fields: [airlineId], references: [id])
+  assignments   CrewAssignments[]
+
+  @@index([passportNumber])
+  @@map("crew_members")
+}
+
+model CrewAssignments {
+  crewMemberId BigInt   @map("crew_member_id")
+  flightId     BigInt   @map("flight_id")
+  assignedDate DateTime @default(now()) @map("assigned_date")
+
+  // Relations
+  crewMember CrewMembers @relation(fields: [crewMemberId], references: [id], onDelete: Cascade)
+  flight     Flights    @relation(fields: [flightId], references: [id], onDelete: Cascade)
+
+  @@id([crewMemberId, flightId])
+  @@map("crew_assignments")
+}
