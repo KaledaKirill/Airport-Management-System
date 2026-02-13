@@ -1,19 +1,8 @@
-import { IsOptional, IsInt, Min, IsString, IsDate } from 'class-validator';
+import { QueryDto } from '../../common/dto/query.dto';
+import { IsOptional, IsInt, IsString, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class QueryFlightDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  skip?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  take?: number;
-
+export class QueryFlightDto extends QueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
